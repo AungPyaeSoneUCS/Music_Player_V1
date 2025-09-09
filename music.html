@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Player</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- jsmediatags for reading MP3 metadata -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+  <style>
+    body {
+      transition: background-color 0.3s, color 0.3s;
+    }
+    /* Day Mode (Light) */
+    .day-mode {
+      background-color: #f8f9fa;
+      color: #212529;
+    }
+    .day-mode .card, .day-mode .btn-outline-dark {
+      background-color: #ffffff;
+      border-color: #dee2e6;
+    }
+    /* Night Mode (Dark) */
+    .night-mode {
+      background-color: #212529;
+      color: #f8f9fa;
+    }
+    .night-mode .card, .night-mode .btn-outline-dark {
+      background-color: #343a40;
+      border-color: #495057;
+      color: #f8f9fa;
+    }
+    .night-mode .btn-outline-dark:hover {
+      background-color: #495057;
+    }
+    /* Playlist hover effect */
+    .list-group-item:hover {
+      cursor: pointer;
+      background-color: #e9ecef;
+    }
+    .night-mode .list-group-item:hover {
+      background-color: #495057;
+    }
+    /* Player styling */
+    #player {
+      transition: all 0.3s ease;
+    }
+    #player.collapsed {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+    #album-art {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 5px;
+    }
+    /* Progress bar */
+    #progress-bar {
+      width: 100%;
+      cursor: pointer;
+    }
+    /* Volume control */
+    #volume-control {
+      width: 100px;
+    }
+    /* Sleep timer buttons */
+    .sleep-timer-btn {
+      margin: 5px;
+    }
+  </style>
+</head>
+<body class="day-mode">
+  <div class="container my-5">
+    <!-- Header with theme toggle and collapse button -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1>Music Player</h1>
+      <div>
+        <button id="theme-toggle" class="btn btn-outline-dark me-2">Switch to Night Mode</button>
+        <button id="toggle-player" class="btn btn-outline-dark">Hide Player</button>
+      </div>
+    </div>
+
+    <!-- File Upload -->
+    <div class="mb-4">
+      <label for="file-input" class="form-label">Upload MP3 Files</label>
+      <input type="file" id="file-input" class="form-control" multiple accept="audio/mp3,audio/mpeg">
+    </div>
+
+    <!-- Playlist -->
+    <div class="card mb-4">
+      <div class="card-header">Playlist</div>
+      <ul id="playlist" class="list-group list-group-flush"></ul>
+    </div>
+
+    <!-- Player Section -->
+    <div id="player" class="card">
+      <div class="card-body">
+        <!-- Now Playing Info -->
+        <div class="d-flex align-items-center mb-3">
+          <img id="album-art" src="https://via.placeholder.com/100" alt="Album Art" class="me-3">
+          <div>
+            <h5 id="now-playing-title">Select a song</h5>
+            <p id="now-playing-artist" class="mb-0">Artist</p>
+            <p id="now-playing-album" class="mb-0">Album</p>
+          </div>
+        </div>
+        <!-- Progress Bar -->
+        <div class="mb-3">
+          <input type="range" id="progress-bar" min="0" max="100" value="0" class="form-range">
+          <div class="d-flex justify-content-between">
+            <span id="current-time">0:00</span>
+            <span id="duration">0:00</span>
+          </div>
+        </div>
+        <!-- Controls -->
+        <div class="d-flex justify-content-center mb-3">
+          <button id="prev-btn" class="btn btn-outline-dark mx-2">Previous</button>
+          <button id="play-pause-btn" class="btn btn-outline-dark mx-2">Play</button>
+          <button id="next-btn" class="btn btn-outline-dark mx-2">Next</button>
+        </div>
+        <!-- Volume Control -->
+        <div class="d-flex align-items-center mb-3">
+          <label for="volume-control" class="form-label me-2">Volume:</label>
+          <input type="range" id="volume-control" min="0" max="1" step="0.01" value="1" class="form-range">
+        </div>
+        <!-- Sleep Timer -->
+        <div>
+          <h6>Sleep Timer</h6>
+          <button class="btn btn-outline-dark sleep-timer-btn" data-minutes="30">30 min</button>
+          <button class="btn btn-outline-dark sleep-timer-btn" data-minutes="45">45 min</button>
+          <button class="btn btn-outline-dark sleep-timer-btn" data-minutes="60">60 min</button>
+          <button class="btn btn-outline-dark sleep-timer-btn" data-minutes="95">95 min</button>
+          <button class="btn btn-outline-dark sleep-timer-btn" data-minutes="100">100 min</button>
+          <button id="cancel-sleep-timer" class="btn btn-outline-danger sleep-timer-btn">Cancel</button>
+          <p id="sleep-timer-status" class="mt-2"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Element -->
+  <audio id="audio-player"></audio>
+
+  <!-- Bootstrap JS and Popper -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const audioPlayer = document.getElementById('audio-player');
+    const playlistElement = document.getElementById('playlist');
+    const playPauseBtn = document.getElementById('play-pause-btn');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const progressBar = document.getElementById('progress-bar');
+    const volumeControl = document.getElementById('volume-control');
+    const currentTimeEl = document.getElementById('current-time');
+    const durationEl = document.getElementById('duration');
+    const nowPlayingTitle = document.getElementById('now-playing-title');
+    const nowPlayingArtist = document.getElementById('now-playing-artist');
+    const nowPlayingAlbum = document.getElementById('now-playing-album');
+    const albumArt = document.getElementById('album-art');
+    const themeToggle = document.getElementById('theme-toggle');
+    const togglePlayerBtn = document.getElementById('toggle-player');
+    const sleepTimerStatus = document.getElementById('sleep-timer-status');
+
+    let playlist = [];
+    let currentTrackIndex = -1;
+    let isPlaying = false;
+    let sleepTimer = null;
+
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = Math.floor(seconds % 60);
+      return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+    }
+
+    // Load MP3 files via file input
+    function loadMusicFiles(event) {
+      const files = event.target.files;
+      playlist = [];
+
+      Array.from(files).forEach((file, index) => {
+        const objectUrl = URL.createObjectURL(file);
+
+        jsmediatags.read(file, {
+          onSuccess: (tag) => {
+            const tags = tag.tags;
+            const picture = tags.picture;
+            let coverUrl = 'https://via.placeholder.com/100';
+            if (picture) {
+              const base64String = btoa(
+                picture.data.reduce((data, byte) => data + String.fromCharCode(byte), '')
+              );
+              coverUrl = `data:${picture.format};base64,${base64String}`;
+            }
+            playlist.push({
+              file: objectUrl,
+              title: tags.title || file.name,
+              artist: tags.artist || 'Unknown Artist',
+              album: tags.album || 'Unknown Album',
+              cover: coverUrl
+            });
+            if (index === files.length - 1) displayPlaylist();
+          },
+          onError: () => {
+            playlist.push({
+              file: objectUrl,
+              title: file.name,
+              artist: 'Unknown Artist',
+              album: 'Unknown Album',
+              cover: 'https://via.placeholder.com/100'
+            });
+            if (index === files.length - 1) displayPlaylist();
+          }
+        });
+      });
+    }
+
+    function displayPlaylist() {
+      playlistElement.innerHTML = '';
+      playlist.forEach((track, index) => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex align-items-center';
+        li.innerHTML = `
+          <img src="${track.cover}" alt="Cover" class="me-3" style="width: 40px; height: 40px; object-fit: cover;">
+          <div>
+            <strong>${track.title}</strong><br>
+            <small>${track.artist} - ${track.album}</small>
+          </div>
+        `;
+        li.addEventListener('click', () => playTrack(index));
+        playlistElement.appendChild(li);
+      });
+    }
+
+    function playTrack(index) {
+      if (index < 0 || index >= playlist.length) return;
+      currentTrackIndex = index;
+      const track = playlist[index];
+      audioPlayer.src = track.file;
+      audioPlayer.play();
+      isPlaying = true;
+      playPauseBtn.textContent = 'Pause';
+      updateNowPlaying(track);
+    }
+
+    function updateNowPlaying(track) {
+      nowPlayingTitle.textContent = track.title;
+      nowPlayingArtist.textContent = track.artist;
+      nowPlayingAlbum.textContent = track.album;
+      albumArt.src = track.cover;
+    }
+
+    playPauseBtn.addEventListener('click', () => {
+      if (isPlaying) {
+        audioPlayer.pause();
+        isPlaying = false;
+        playPauseBtn.textContent = 'Play';
+      } else {
+        audioPlayer.play();
+        isPlaying = true;
+        playPauseBtn.textContent = 'Pause';
+      }
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (currentTrackIndex < playlist.length - 1) {
+        playTrack(currentTrackIndex + 1);
+      }
+    });
+
+    prevBtn.addEventListener('click', () => {
+      if (currentTrackIndex > 0) {
+        playTrack(currentTrackIndex - 1);
+      }
+    });
+
+    audioPlayer.addEventListener('timeupdate', () => {
+      const currentTime = audioPlayer.currentTime;
+      const duration = audioPlayer.duration || 0;
+      progressBar.value = duration ? (currentTime / duration) * 100 : 0;
+      currentTimeEl.textContent = formatTime(currentTime);
+      durationEl.textContent = formatTime(duration);
+    });
+
+    progressBar.addEventListener('input', () => {
+      const duration = audioPlayer.duration || 0;
+      audioPlayer.currentTime = (progressBar.value / 100) * duration;
+    });
+
+    volumeControl.addEventListener('input', () => {
+      audioPlayer.volume = volumeControl.value;
+    });
+
+    themeToggle.addEventListener('click', () => {
+      document.body.classList.toggle('day-mode');
+      document.body.classList.toggle('night-mode');
+      themeToggle.textContent = document.body.classList.contains('night-mode')
+        ? 'Switch to Day Mode'
+        : 'Switch to Night Mode';
+    });
+
+    togglePlayerBtn.addEventListener('click', () => {
+      const player = document.getElementById('player');
+      player.classList.toggle('collapsed');
+      togglePlayerBtn.textContent = player.classList.contains('collapsed')
+        ? 'Show Player'
+        : 'Hide Player';
+    });
+
+    document.querySelectorAll('.sleep-timer-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const minutes = parseInt(btn.dataset.minutes);
+        if (minutes) {
+          clearTimeout(sleepTimer);
+          const ms = minutes * 60 * 1000;
+          sleepTimer = setTimeout(() => {
+            audioPlayer.pause();
+            isPlaying = false;
+            playPauseBtn.textContent = 'Play';
+            sleepTimerStatus.textContent = 'Sleep timer ended.';
+          }, ms);
+          sleepTimerStatus.textContent = `Sleep timer set for ${minutes} minutes.`;
+        }
+      });
+    });
+
+    document.getElementById('cancel-sleep-timer').addEventListener('click', () => {
+      clearTimeout(sleepTimer);
+      sleepTimerStatus.textContent = 'Sleep timer cancelled.';
+    });
+
+    audioPlayer.addEventListener('ended', () => {
+      if (currentTrackIndex < playlist.length - 1) {
+        playTrack(currentTrackIndex + 1);
+      } else {
+        isPlaying = false;
+        playPauseBtn.textContent = 'Play';
+      }
+    });
+
+    document.getElementById('file-input').addEventListener('change', loadMusicFiles);
+  </script>
+</body>
+</html>
